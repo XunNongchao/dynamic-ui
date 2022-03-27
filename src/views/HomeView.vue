@@ -1,9 +1,9 @@
 <template>
   <el-container>
     <el-aside>
-      <el-button type="primary" @click="initGraph">初始化</el-button>
       <el-button type="primary" @click="generateData">生成数据</el-button>
-      <el-button type="primary" @click="changeLabel">label变化</el-button>
+      <el-button type="primary" @click="start">start</el-button>
+      <el-button type="primary" @click="stop">stop</el-button>
       <div class="component-list">
         <div
             class="component-item"
@@ -21,11 +21,48 @@
           @drop="dropCompo"
       ></div>
     </el-main>
+    <div class="right-content">
+      <el-form
+          ref="selectNode"
+          :model="selectNode"
+          label-position="right"
+          label-width="50px"
+          size="mini"
+          style="margin: 5px"
+      >
+        <el-form-item label="id">
+          <el-input v-model="selectNode.id" :disabled="true" class="right-content-input"/>
+        </el-form-item>
+        <el-form-item label="label">
+          <el-input v-model="selectNode.label" class="right-content-input"/>
+        </el-form-item>
+        <el-form-item label="type">
+          <el-select v-model="selectNode.type" class="right-content-input">
+            <el-option
+                v-for="item in nodeType"
+                :value="item.value"
+                :label="item.label"
+                :key="item.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="x">
+          <el-input v-model="selectNode.x" class="right-content-input"/>
+        </el-form-item>
+        <el-form-item label="y">
+          <el-input v-model="selectNode.y" class="right-content-input"/>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="updateNode">更新</el-button>
+        </el-form-item>
+      </el-form>
+    </div>
   </el-container>
 </template>
 
 <script>
 import G6 from '@antv/g6'
+// import graph from "@/store/modules/graph";
 // import {mapGetters} from 'vuex'
 
 export default {
@@ -65,8 +102,48 @@ export default {
           }
         }
       ],
+      nodeType: [
+        {
+          value: 'circle',
+          label: '圆形'
+        },
+        {
+          value: 'rect',
+          label: '矩形'
+        },
+        {
+          value: 'ellipse',
+          label: '椭圆'
+        },
+        {
+          value: 'diamond',
+          label: '菱形'
+        },
+        {
+          value: 'triangle',
+          label: '三角形'
+        },
+        {
+          value: 'star',
+          label: '星形'
+        },
+        {
+          value: 'image',
+          label: '图片'
+        },
+        {
+          value: 'modelRect',
+          label: '卡片'
+        },
+        {
+          value: 'donut',
+          label: '甜甜圈'
+        },
+      ],
       draggingCompo: undefined,
-      graphData: {nodes: []}
+      graphData: {nodes: []},
+      selectNode: {},
+      interval: []
     }
   },
   computed: {
@@ -94,21 +171,28 @@ export default {
         this.graph.render()
       }
     },
-    changeLabel() {
-      this.graphData.nodes.map(item => item.label += '!')
-      this.graph.refresh()
+    start() {
+      this.interval.push(setInterval(() => {
+        this.graphData.nodes.map(item => item.label += '!')
+        this.graph.refresh()
+      }, 100))
+    },
+    stop() {
+      this.interval.forEach(item => clearInterval(item))
     },
     generateData() {
       // svg模式和canvas模式性能差距巨大
       // svg一次性渲染千个节点需要5s，canvas渲染万个节点都是瞬间
-      for (let i = 0; i < 10000; i++) {
-        this.graphData.nodes.push({
-          id: i + '',
-          type: 'circle',
-          label: 'label',
-          x: i + 100,
-          y: i + 100
-        })
+      for (let i = 0; i < 100; i++) {
+        for (let j = 0; j < 100; j++) {
+          this.graphData.nodes.push({
+            id: i + j + Math.random() + '',
+            type: 'circle',
+            label: 'label',
+            x: i + 50 * i,
+            y: j + 50 * j
+          })
+        }
       }
       this.graph.data(this.graphData)
       this.graph.render()
@@ -119,6 +203,7 @@ export default {
         container: 'container',
         fitView: true,
         renderer: 'canvas',
+        // renderer: 'svg',
         autoPaint: true,
         modes: {
           default: ['drag-node', 'drag-canvas', 'click-select', 'scroll-canvas']
@@ -135,23 +220,31 @@ export default {
                   height: 30,
                   // DOM's html
                   // dom无法使用element组件，无法响应G6事件
+                  // 无法获取、调用vue的data和method
                   html: `
-<div style="height: 25px;width: 100px;border: 1px solid mediumpurple;border-radius: 5px">
-    <span style="margin-top: 5px;margin-bottom: 5px;margin-right: 5px;border: 1px solid rebeccapurple;height: 100%;width: 30px">我是</span>
-    <span style="margin-top: 5px;margin-bottom: 5px;border: 1px solid rebeccapurple;height: 100%;width: 70px">${cfg.label}</span>
+<div style="height: 25px;width: 100px;border: 1px solid mediumpurple;border-radius: 5px" onclick="console.log('dom label click')">
+    <span>${cfg.label}</span>
 </div>
 `,
                 },
                 // must be assigned in G6 3.3 and later versions. it can be any value you want
-                name: 'dom-shape',
+                name: 'dom-label',
                 draggable: true,
               });
             }
           }
       )
-    }
+      this.graph.on('node:click', evt => {
+        console.log('g6 node click', evt)
+        this.selectNode = evt.item._cfg.model
+      })
+    },
+    updateNode() {
+      this.graph.refresh()
+    },
   },
   mounted() {
+    this.initGraph()
   }
 }
 </script>
@@ -185,5 +278,18 @@ export default {
   width: 100px;
   margin: 5px;
   text-align: center;
+}
+
+.right-content {
+  float: right;
+  height: 100%;
+  width: 200px;
+  background-color: #D3DCE6;
+  color: #333;
+}
+
+.el-input--mini {
+  text-align: left;
+  width: 120px;
 }
 </style>
